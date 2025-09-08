@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  spark-master:
+    build:
+      context: .
+      dockerfile: ./docker/spark/Dockerfile
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_MASTER_OPTS=-Dspark.deploy.defaultCores=1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_SHARED_CREDENTIALS_FILE=/home/spark/.aws/credentials
+      - AWS_CONFIG_FILE=/home/spark/.aws/config
+      - S3_BUCKET_NAME=f1-data-lake-naveeth
+      - ENVIRONMENT=development
+    ports:
+      - "8081:8080"  # Spark Master Web UI
+      - "7077:7077"  # Spark Master Port
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./config:/opt/spark/config
+      - ./data:/opt/spark/data
+      - ./utils:/opt/spark/utils
+      - ./scripts:/opt/spark/scripts
+      - ~/.aws:/home/spark/.aws:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  spark-worker:
+    build:
+      context: .
+      dockerfile: ./docker/spark/Dockerfile
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_SHARED_CREDENTIALS_FILE=/home/spark/.aws/credentials
+      - AWS_CONFIG_FILE=/home/spark/.aws/config
+      - S3_BUCKET_NAME=f1-data-lake-naveeth
+      - ENVIRONMENT=development
+    ports:
+      - "8082:8081"  # Spark Worker Web UI
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./config:/opt/spark/config
+      - ./data:/opt/spark/data
+      - ./utils:/opt/spark/utils
+      - ./scripts:/opt/spark/scripts
+      - ~/.aws:/home/spark/.aws:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: ./docker/airflow/Dockerfile
+    container_name: airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=a25mQ1FHTUh3MnFRSk5KMEIyVVU2YmN0VGRyYTVXY08=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./jobs:/opt/airflow/jobs
+      - ./config:/opt/airflow/config
+      - ./sql:/opt/airflow/sql
+      - ./logs:/opt/airflow/logs
+      - ./utils:/opt/airflow/utils
+      - ~/.aws:/home/airflow/.aws:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
+        airflow webserver
+      "
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: ./docker/airflow/Dockerfile
+    container_name: airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=a25mQ1FHTUh3MnFRSk5KMEIyVVU2YmN0VGRyYTVXY08=
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./jobs:/opt/airflow/jobs
+      - ./config:/opt/airflow/config
+      - ./sql:/opt/airflow/sql
+      - ./logs:/opt/airflow/logs
+      - ./utils:/opt/airflow/utils
+    depends_on:
+      postgres:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+    restart: always
+    command: airflow scheduler
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    driver: bridge

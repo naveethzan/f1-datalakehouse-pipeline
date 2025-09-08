@@ -1,0 +1,140 @@
+# Local development settings (using real AWS S3)
+environment: "development"
+
+# AWS Services Configuration (same for both local and production)
+aws_services:
+  region: "us-east-1"
+  profile: "default"
+  s3_bucket: "f1-data-lake-naveeth"
+  cloudwatch_namespace: "F1Pipeline"
+  glue_catalog_database: "f1_data_catalog"
+  iam_role: "F1-DataPipeline-Role"
+
+s3:
+  bucket_name: "f1-data-lake-naveeth"
+  bronze_prefix: "bronze/"
+  silver_prefix: "silver/"
+  gold_prefix: "gold/"
+
+api:
+  base_url: "https://api.openf1.org/v1"
+  rate_limit_per_second: 2
+  rate_limit_seconds: 0.2
+  max_retries: 3
+  timeout_seconds: 30
+
+session_types:
+  - "Qualifying"
+  - "Race"
+
+target_year: 2025
+
+parquet:
+  compression: "snappy"
+  row_group_size: 50000
+  use_dictionary: true
+  write_statistics: true
+  coerce_timestamps: "ms"
+  allow_truncated_timestamps: true
+
+cloudwatch:
+  namespace: "F1Pipeline/Bronze"
+  environment_dimension: "dev"
+  enabled: true
+
+lineage:
+  enabled: true
+  s3_prefix: "lineage/"
+  events_prefix: "events/"
+  summaries_prefix: "summaries/"
+  producer: "f1-data-pipeline/bronze-layer"
+  schema_url: "https://openlineage.io/spec/1-0-5/OpenLineage.json#/$defs/RunEvent"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  include_timestamp: true
+  log_file: null
+
+data_validation:
+  enabled: true
+  fail_on_critical_errors: true
+  warning_threshold_percent: 50
+
+# Spark and Iceberg configurations are now handled by SparkConfigManager
+# Only essential environment settings here
+spark:
+  master_url: "spark://spark-master:7077"  # Only the master URL needed
+
+# Silver layer specific configuration
+silver:
+  database_name: "f1_silver_db"
+  target_file_size_mb: 128
+  large_table_file_size_mb: 256
+  maintenance:
+    snapshot_retention_days: 7
+    compaction_enabled: true
+    orphan_file_cleanup_enabled: true
+
+# Gold layer specific configuration
+gold:
+  database_name: "f1_gold_db"
+  target_file_size_mb: 256  # Larger files for analytics workloads
+  session_specific_processing: true
+  tables:
+    - "driver_performance_summary_qualifying"
+    - "driver_performance_summary_race"
+    - "championship_tracker"
+    - "team_strategy_analysis"
+    - "race_weekend_insights"
+  maintenance:
+    snapshot_retention_days: 30  # Longer retention for analytics
+    compaction_enabled: true
+    orphan_file_cleanup_enabled: true
+    optimize_schedule: "weekly"
+
+# Environment-Specific Task Configurations
+tasks:
+  silver_transformation:
+    development:
+      script_path: "jobs/f1_bronze_to_silver_transform.py"
+      # Spark configurations handled by SparkConfigManager
+    production:
+      job_name: "f1-bronze-to-silver-transform"
+      script_location: "s3://f1-data-lake-naveeth/jobs/f1_bronze_to_silver_transform.py"
+      iam_role_name: "F1-DataPipeline-Role"
+      glue_version: "4.0"
+      number_of_workers: 10
+      worker_type: "G.1X"
+      max_retries: 1
+      timeout: 60
+      retries: 1
+      retry_delay: "00:05:00"
+
+  gold_transformation:
+    development:
+      script_path: "jobs/f1_silver_to_gold_transform.py"
+      # Spark configurations handled by SparkConfigManager
+    production:
+      job_name: "f1-silver-to-gold-transform"
+      script_location: "s3://f1-data-lake-naveeth/jobs/f1_silver_to_gold_transform.py"
+      iam_role_name: "F1-DataPipeline-Role"
+      glue_version: "4.0"
+      number_of_workers: 5
+      worker_type: "G.2X"
+      max_retries: 2
+      timeout: 60
+      retries: 2
+      retry_delay: "00:03:00"
+
+# Airflow-specific settings
+airflow:
+  dag_settings:
+    max_active_runs: 1
+    retries: 2
+    retry_delay_minutes: 5
+    catchup: false
+  variables:
+    f1_config_path: "/opt/airflow/config/dev.yaml"
+    s3_bucket: "f1-data-lake-naveeth"
+    target_year: 2025

@@ -1,0 +1,22 @@
+# F1 Data Pipeline - MWAA Environment Requirements
+# This file is used for MWAA environment (Airflow orchestration)
+
+# Only dependency we actually use in Airflow DAGs
+requests==2.31.0
+
+# Airflow and orchestration (MWAA specific)
+apache-airflow==2.7.2
+apache-airflow-providers-postgres==5.6.0
+apache-airflow-providers-amazon==8.7.1
+
+# Note: MWAA provides ALL other dependencies:
+# - boto3, botocore (AWS SDK)
+# - urllib3 (HTTP client)
+# - pyspark, pyarrow, pandas (data processing)
+# - Iceberg support (native via Spark configurations)
+# - pyyaml (YAML parsing)
+
+# Note: This file is for MWAA DEPLOYMENT only
+# - Glue environment uses requirements-glue.txt (ZERO external deps)
+# - Local development uses requirements.txt (all deps)
+# - NO pyyaml dependency (MWAA DAGs use hardcoded config)

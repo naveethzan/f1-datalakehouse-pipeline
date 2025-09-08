@@ -1,0 +1,19 @@
+# F1 Data Pipeline - Glue Environment Requirements
+# This file is used for AWS Glue jobs (ZERO external dependencies!)
+
+# NO external dependencies needed!
+# Glue jobs use hardcoded configuration and native Glue services
+
+# Note: Glue 4.0 provides ALL dependencies we need:
+# - pyspark, pyarrow, pandas, numpy (data processing)
+# - boto3, botocore (AWS SDK)
+# - urllib3 (HTTP client)
+# - Iceberg support (native via Spark configurations)
+# - All other AWS services
+
+# Note: This file is for GLUE DEPLOYMENT only
+# - MWAA environment uses requirements-mwaa.txt (requests + Airflow deps)
+# - Local development uses requirements.txt (all deps)
+# - NO Airflow dependencies to avoid google-re2 compilation failure
+# - NO requests dependency (Glue jobs don't make API calls)
+# - NO pyyaml dependency (Glue jobs use hardcoded config)

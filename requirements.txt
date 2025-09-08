@@ -1,0 +1,24 @@
+# F1 Data Pipeline - Local Development Requirements
+# This file contains ALL dependencies needed for local development
+
+# Core dependencies (for local development only)
+requests==2.31.0
+pyyaml==6.0.1
+
+# Spark and data processing (for local development)
+pyspark==3.5.0
+pyarrow==16.1.0
+pandas==2.2.2
+
+# Airflow and orchestration (for local development)
+apache-airflow==2.7.2
+apache-airflow-providers-postgres==5.6.0
+apache-airflow-providers-amazon==8.7.1
+
+# Build and packaging tools
+setuptools>=80.0.0
+
+# Note: This file is for LOCAL DEVELOPMENT only
+# - Glue environment uses requirements-glue.txt (ZERO external deps)
+# - MWAA environment uses requirements-mwaa.txt (requests + Airflow deps)
+# - Removed: pyiceberg, urllib3, boto3, botocore (provided by Glue/Python)
