@@ -17,8 +17,3 @@ apache-airflow-providers-amazon==8.7.1
 
 # Build and packaging tools
 setuptools>=80.0.0
-
-# Note: This file is for LOCAL DEVELOPMENT only
-# - Glue environment uses requirements-glue.txt (ZERO external deps)
-# - MWAA environment uses requirements-mwaa.txt (requests + Airflow deps)
-# - Removed: pyiceberg, urllib3, boto3, botocore (provided by Glue/Python)

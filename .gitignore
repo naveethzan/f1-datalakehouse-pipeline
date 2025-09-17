@@ -211,29 +211,11 @@ test_output/
 .local/
 local_config.*
 
-# AWS specific
-.aws-sam/
-sam-build/
-.aws-credentials
-aws-credentials.*
-terraform.tfstate*
-.terraform/
-
 # Spark/Hadoop artifacts
 spark-events/
 spark-warehouse/
 checkpoint/
 _spark_metadata/
-
-# Data pipeline artifacts
-output/
-processed/
-staging/
-bronze/
-silver/
-gold/
-lineage/
-metrics/
 
 # Jupyter notebooks (if added later)
 *.ipynb
